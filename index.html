@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>Formulário de Fornecedores</title>
+  <style>
+    :root {
+      --primaria: #2563eb;
+      --cinza: #f5f5f5;
+      --borda: #d9d9d9;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Inter", Arial, sans-serif;
+      background: var(--cinza);
+      padding: 24px;
+      color: #111;
+    }
+
+    .card {
+      background: #fff;
+      max-width: 920px;
+      margin: 0 auto;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+    }
+
+    h1 { margin: 0 0 12px; font-size: 26px; }
+    p.desc { margin: 0 0 18px; color: #555; }
+
+    .linha {
+      display: flex;
+      gap: 14px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+
+    .linha > div { flex: 1 1 260px; }
+
+    label {
+      display: block;
+      margin-bottom: 6px;
+      font-weight: 600;
+      font-size: 13px;
+      color: #333;
+    }
+
+    input, select, textarea {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--borda);
+      border-radius: 8px;
+      font-size: 14px;
+      background: #fff;
+    }
+
+    textarea { min-height: 90px; resize: vertical; }
+
+    .tabs {
+      display: flex;
+      gap: 8px;
+      margin: 16px 0 8px;
+      flex-wrap: wrap;
+    }
+
+    .tab-btn {
+      padding: 10px 14px;
+      border: 1px solid var(--borda);
+      border-radius: 10px;
+      background: #fafafa;
+      cursor: pointer;
+      font-weight: 600;
+      transition: 0.15s ease;
+    }
+
+    .tab-btn.ativo {
+      background: var(--primaria);
+      color: #fff;
+      border-color: var(--primaria);
+      box-shadow: 0 8px 18px rgba(37, 99, 235, 0.18);
+    }
+
+    .aba { display: none; border: 1px solid var(--borda); border-radius: 10px; padding: 14px; background: #fafafa; }
+    .aba.ativa { display: block; }
+
+    button {
+      padding: 12px 18px;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      font-weight: 700;
+      font-size: 14px;
+      background: var(--primaria);
+      color: #fff;
+      box-shadow: 0 8px 16px rgba(37, 99, 235, 0.2);
+    }
+
+    .msg { margin-top: 10px; font-size: 13px; }
+    .msg.ok { color: green; }
+    .msg.erro { color: crimson; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Cadastro de Fornecedores</h1>
+    <p class="desc">Selecione o tipo de solicitação e preencha os campos específicos da aba.</p>
+
+    <div class="linha">
+      <div>
+        <label>Solicitante</label>
+        <input id="solicitante" type="text" placeholder="Seu nome ou e-mail" />
+      </div>
+      <div>
+        <label>Unidade / Loja</label>
+        <input id="unidade" type="text" placeholder="Ex: 602 - EDUCADOS" />
+      </div>
+    </div>
+
+    <div class="linha">
+      <div>
+        <label>Ordem de Serviço (OS)</label>
+        <input id="os" type="text" />
+      </div>
+      <div>
+        <label>Tipo de pedido</label>
+        <select id="tipo-pedido">
+          <option value="">Selecione...</option>
+          <option value="fornecedor_requisicao">Fornecedor - Requisição</option>
+          <option value="fornecedor_outros">Fornecedor - Outros</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab-btn" data-target="aba-requisicao" aria-controls="aba-requisicao">Requisição</button>
+      <button class="tab-btn" data-target="aba-outros" aria-controls="aba-outros">Outros itens/serviços</button>
+    </div>
+
+    <div id="aba-requisicao" class="aba">
+      <h3>Requisição de Fornecedor</h3>
+      <div class="linha">
+        <div>
+          <label>Razão social / Nome</label>
+          <input id="req-razao" type="text" placeholder="Nome do fornecedor" />
+        </div>
+        <div>
+          <label>Tipo de fornecedor</label>
+          <select id="req-tipo-fornecedor">
+            <option value="material">Material</option>
+            <option value="servico">Serviço</option>
+            <option value="parceria">Parceria</option>
+          </select>
+        </div>
+      </div>
+      <div class="linha">
+        <div>
+          <label>Contato principal</label>
+          <input id="req-contato" type="text" placeholder="Telefone ou e-mail" />
+        </div>
+        <div>
+          <label>Prioridade</label>
+          <select id="req-prioridade">
+            <option value="baixa">Baixa</option>
+            <option value="media">Média</option>
+            <option value="alta">Alta</option>
+            <option value="critica">Crítica</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <label>Descrição da requisição</label>
+        <textarea id="req-descricao" placeholder="O que precisa ser solicitado a este fornecedor?"></textarea>
+      </div>
+    </div>
+
+    <div id="aba-outros" class="aba">
+      <h3>Outros pedidos para fornecedores</h3>
+      <div class="linha">
+        <div>
+          <label>Categoria</label>
+          <select id="outros-categoria">
+            <option value="documentacao">Documentação</option>
+            <option value="cotacao">Cotação</option>
+            <option value="suporte">Suporte</option>
+            <option value="outro">Outro</option>
+          </select>
+        </div>
+        <div>
+          <label>Fornecedor preferencial</label>
+          <input id="outros-fornecedor" type="text" placeholder="Opcional" />
+        </div>
+      </div>
+      <div>
+        <label>Detalhes do pedido (um item por linha)</label>
+        <textarea id="outros-detalhes" placeholder="Ex:\nAtualizar contrato\nEnviar catálogo de produtos"></textarea>
+      </div>
+    </div>
+
+    <div style="margin-top: 16px;">
+      <button id="btn-enviar">Enviar pedido</button>
+      <div id="mensagem" class="msg" role="status"></div>
+    </div>
+  </div>
+
+  <script>
+    const selectTipo = document.getElementById('tipo-pedido');
+    const tabs = Array.from(document.querySelectorAll('.tab-btn'));
+    const abas = {
+      'aba-requisicao': document.getElementById('aba-requisicao'),
+      'aba-outros': document.getElementById('aba-outros')
+    };
+    const mensagem = document.getElementById('mensagem');
+
+    function ativarAba(id) {
+      Object.values(abas).forEach(aba => aba.classList.remove('ativa'));
+      tabs.forEach(btn => btn.classList.remove('ativo'));
+
+      const aba = abas[id];
+      const botao = tabs.find(btn => btn.dataset.target === id);
+      if (aba) aba.classList.add('ativa');
+      if (botao) botao.classList.add('ativo');
+    }
+
+    // sincroniza select com tabs
+    selectTipo.addEventListener('change', () => {
+      if (selectTipo.value === 'fornecedor_outros') {
+        ativarAba('aba-outros');
+      } else if (selectTipo.value === 'fornecedor_requisicao') {
+        ativarAba('aba-requisicao');
+      } else {
+        Object.values(abas).forEach(aba => aba.classList.remove('ativa'));
+        tabs.forEach(btn => btn.classList.remove('ativo'));
+      }
+    });
+
+    // troca de aba manual
+    tabs.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const target = btn.dataset.target;
+        ativarAba(target);
+        selectTipo.value = target === 'aba-requisicao' ? 'fornecedor_requisicao' : 'fornecedor_outros';
+      });
+    });
+
+    document.getElementById('btn-enviar').addEventListener('click', async () => {
+      mensagem.textContent = '';
+      mensagem.className = 'msg';
+
+      const base = {
+        solicitante: document.getElementById('solicitante').value,
+        unidade: document.getElementById('unidade').value,
+        os: document.getElementById('os').value,
+        tipo_pedido: selectTipo.value
+      };
+
+      let especifico = {};
+      if (selectTipo.value === 'fornecedor_requisicao') {
+        especifico = {
+          fornecedor_requisicao: {
+            razao_social: document.getElementById('req-razao').value,
+            tipo_fornecedor: document.getElementById('req-tipo-fornecedor').value,
+            contato: document.getElementById('req-contato').value,
+            prioridade: document.getElementById('req-prioridade').value,
+            descricao: document.getElementById('req-descricao').value
+          }
+        };
+      } else if (selectTipo.value === 'fornecedor_outros') {
+        especifico = {
+          fornecedor_outros: {
+            categoria: document.getElementById('outros-categoria').value,
+            fornecedor_preferencial: document.getElementById('outros-fornecedor').value,
+            detalhes: document.getElementById('outros-detalhes').value
+          }
+        };
+      }
+
+      const body = { ...base, ...especifico };
+
+      try {
+        const resp = await fetch('https://SEU_N8N/webhook/fornecedor', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+
+        if (!resp.ok) throw new Error('Erro no envio');
+        await resp.json().catch(() => ({}));
+        mensagem.textContent = 'Pedido enviado com sucesso!';
+        mensagem.classList.add('ok');
+      } catch (err) {
+        console.error(err);
+        mensagem.textContent = 'Não foi possível enviar. Verifique os campos e tente novamente.';
+        mensagem.classList.add('erro');
+      }
+    });
+  </script>
+</body>
+</html>
