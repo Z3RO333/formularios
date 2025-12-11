@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Sistema corporativo de solicitação de pedidos">
+    <title>Solicitar Pedido | Sistema de Pedidos</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="config.js"></script>
+    <script src="data-layer.js"></script>
+    <style>
+        :root {
+            --primary: #3b82f6;
+            --primary-dark: #1d4ed8;
+            --bg-body: radial-gradient(circle at 20% 20%, rgba(59,130,246,0.2), transparent 25%),
+                        radial-gradient(circle at 80% 0%, rgba(14,165,233,0.18), transparent 25%),
+                        #0b1221;
+            --text: #e2e8f0;
+            --muted: #94a3b8;
+            --border: #1f2937;
+            --shadow: 0 20px 60px rgba(0,0,0,0.35);
+            --radius: 14px;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background: var(--bg-body);
+            color: var(--text);
+            min-height: 100vh;
+            padding: 40px 16px 80px;
+            position: relative;
+            overflow-x: hidden;
+        }
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background:
+                radial-gradient(1px 1px at 20% 30%, rgba(255,255,255,0.6), transparent),
+                radial-gradient(2px 2px at 70% 10%, rgba(255,255,255,0.4), transparent),
+                radial-gradient(2px 2px at 50% 80%, rgba(255,255,255,0.35), transparent),
+                radial-gradient(1px 1px at 90% 50%, rgba(255,255,255,0.45), transparent);
+            opacity: 0.5;
+            pointer-events: none;
+            animation: stars 60s linear infinite;
+        }
+        @keyframes stars { from { transform: translateX(0); } to { transform: translateX(80px); } }
+        .page { max-width: 1100px; margin: 0 auto; position: relative; z-index: 1; }
+        .hero { margin-bottom: 20px; display: flex; gap: 16px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+        .hero-title h1 { margin: 0; font-size: clamp(24px, 3vw, 32px); }
+        .hero-title p { margin: 6px 0 0; color: var(--muted); }
+        .badge { display: inline-flex; align-items: center; gap: 6px; background: rgba(59,130,246,0.15); color: #bfdbfe; padding: 6px 10px; border-radius: 999px; font-weight: 600; font-size: 13px; }
+        .card { background: rgba(15,23,42,0.9); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
+        .header { padding: 20px; background: linear-gradient(135deg, rgba(59,130,246,0.2), rgba(14,165,233,0.15)); border-bottom: 1px solid var(--border); }
+        .form { padding: 24px; }
+        .section { margin-bottom: 24px; }
+        .section h3 { margin: 0 0 8px; font-size: 18px; }
+        .section p { margin: 0 0 12px; color: var(--muted); }
+        .grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+        label { display: block; margin-bottom: 6px; font-weight: 600; }
+        label .req { color: #f87171; }
+        input, select, textarea { width: 100%; padding: 12px; border-radius: 10px; border: 1px solid var(--border); background: #0b1221; color: var(--text); font-size: 14px; }
+        textarea { resize: vertical; min-height: 90px; }
+        input:focus, select:focus, textarea:focus { outline: 2px solid rgba(59,130,246,0.35); border-color: var(--primary); }
+        .muted { color: var(--muted); font-size: 13px; }
+        .actions { display: flex; gap: 10px; margin-top: 24px; flex-wrap: wrap; }
+        .btn { border: none; padding: 12px 18px; border-radius: 10px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; }
+        .btn-primary { background: linear-gradient(135deg, var(--primary), var(--primary-dark)); color: #fff; box-shadow: 0 10px 30px rgba(59,130,246,0.35); }
+        .btn-secondary { background: #1f2937; color: #e2e8f0; }
+        .btn-outline { background: transparent; border: 1px dashed var(--border); color: var(--text); }
+        .table-wrapper { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+        table { width: 100%; border-collapse: collapse; background: #0b1221; }
+        th, td { padding: 10px; border-bottom: 1px solid var(--border); text-align: left; font-size: 14px; }
+        th { background: rgba(255,255,255,0.03); font-weight: 600; }
+        tr:hover td { background: rgba(255,255,255,0.02); }
+        .upload { border: 1px dashed var(--border); border-radius: 10px; padding: 18px; text-align: center; cursor: pointer; background: rgba(255,255,255,0.02); }
+        .upload.dragover { border-color: var(--primary); background: rgba(59,130,246,0.08); }
+        .file-list { margin-top: 10px; display: grid; gap: 8px; }
+        .file { display: flex; justify-content: space-between; background: rgba(255,255,255,0.03); padding: 10px; border-radius: 8px; align-items: center; }
+        .alert { display: none; margin-bottom: 12px; padding: 12px; border-radius: 10px; }
+        .alert.show { display: block; }
+        .alert-success { background: rgba(34,197,94,0.15); border: 1px solid rgba(34,197,94,0.3); color: #bbf7d0; }
+        .alert-error { background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.3); color: #fecdd3; }
+        @media (max-width: 640px) { .actions { flex-direction: column; } .btn { width: 100%; justify-content: center; } }
+    </style>
+</head>
+<body>
+<div class="page">
+    <div class="hero">
+        <div class="hero-title">
+            <div class="badge">🪐 Ambiente Corporativo</div>
+            <h1>Solicitar Pedido</h1>
+            <p>Pedidos entram como <strong>PENDENTE_APROVACAO</strong> com data/hora e quem criou.</p>
+        </div>
+        <div class="hero-cta">
+            <a class="btn btn-secondary" href="painel.html">Ir para Painel Restrito →</a>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="header">
+            <h2 style="margin:0;">Formulário de Solicitação</h2>
+            <p class="muted" style="margin:6px 0 0;">Campos essenciais para rastreabilidade, fornecedor e aprovação.</p>
+        </div>
+        <div class="form">
+            <div id="alertContainer" class="alert"></div>
+            <form id="pedidoForm">
+        <div class="section">
+            <h3>Dados do Solicitante</h3>
+            <p class="muted">Identificamos quem solicita e para qual área/loja.</p>
+            <div class="grid">
+                <div>
+                    <label>Solicitante <span class="req">*</span></label>
+                    <input type="text" name="nomeSolicitante" required placeholder="Seu nome completo">
+                </div>
+                <div style="display:none;">
+                    <!-- Preenchemos e-mail automaticamente apenas para backend; não exibido ao usuário. -->
+                    <input type="email" name="emailSolicitante" value="sem-email@empresa.com">
+                </div>
+                <div>
+                    <label>Área / Setor <span class="req">*</span></label>
+                    <select name="areaSetor" required id="areaSetorSelect"></select>
+                </div>
+                <div>
+                    <label>Loja / Unidade <span class="req">*</span></label>
+                    <select name="lojaUnidade" required id="lojaSelect"></select>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>Fornecedor</h3>
+            <p class="muted">Nome livre (como digitado). O sistema faz matching aproximado e evita duplicidade.</p>
+            <div class="grid">
+                <div>
+                    <label>Nome do fornecedor digitado <span class="req">*</span></label>
+                    <input type="text" name="fornecedorNomeDigitado" required placeholder="Ex: Casa Universal, Maqfuso, etc.">
+                </div>
+                <div>
+                    <label>Tipo de Pedido <span class="req">*</span></label>
+                    <select name="tipoPedido" required id="tipoPedidoSelect"></select>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h3>Ordens de Serviço</h3>
+            <div>
+                <label>Detalhes das OS</label>
+                <textarea name="ordensServico" placeholder="Número(s) ou descrição das OS relacionadas"></textarea>
+            </div>
+        </div>
+
+                <div class="section">
+                    <h3>Itens do Pedido</h3>
+                    <p class="muted">Itens são vinculados ao Pedido e podem ser agrupados por fornecedor ou loja.</p>
+                    <div class="actions" style="margin-top:0; margin-bottom:10px;">
+                        <button type="button" class="btn btn-outline" id="btnAddItem">+ Adicionar item</button>
+                    </div>
+                    <div class="table-wrapper">
+                        <table id="itensTable">
+                            <thead>
+                            <tr>
+                                <th>Material / Serviço</th>
+                                <th>Qtd</th>
+                                <th>Unidade</th>
+                                <th>Fornecedor (item)</th>
+                                <th>Preço unit. estimado</th>
+                                <th>Observação</th>
+                                <th></th>
+                            </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <h3>Anexos (cotações, PDFs, imagens)</h3>
+                    <div class="upload" id="uploadArea">
+                        <input type="file" id="anexosInput" multiple accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" style="display:none">
+                        <p style="margin:0 0 6px; font-weight:600;">Clique ou arraste arquivos</p>
+                        <p class="muted" style="margin:0;">Limite: 10 arquivos, até 5MB cada</p>
+                    </div>
+                    <div class="file-list" id="fileList"></div>
+                </div>
+
+                <div class="actions">
+                    <button type="submit" class="btn btn-primary" id="btnSubmit">📤 Enviar solicitação</button>
+                    <button type="button" class="btn btn-secondary" id="btnReset">↺ Limpar</button>
+                </div>
+                <p class="muted" style="margin-top:8px;">Ao enviar, o pedido recebe status PENDENTE_APROVACAO, registra data/hora e cria histórico. Fornecedor é identificado via CNPJ ou similaridade.</p>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    const AppState = { anexos: [] };
+
+    const UI = {
+        alert(message, type = 'success') {
+            const el = document.getElementById('alertContainer');
+            el.textContent = message;
+            el.className = `alert alert-${type} show`;
+            setTimeout(() => el.classList.remove('show'), 4500);
+        },
+        renderSelect(id, options) {
+            const select = document.getElementById(id);
+            select.innerHTML = '<option value="">Selecione...</option>' + options.map((o) => `<option value="${o}">${o}</option>`).join('');
+        },
+        addItemRow(item = {}) {
+            const tbody = document.querySelector('#itensTable tbody');
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td><input type="text" value="${item.material || ''}" placeholder="Material ou serviço" required></td>
+                <td><input type="number" min="1" value="${item.quantidade || 1}" style="width:80px" required></td>
+                <td>
+                    <select>${window.APP_CONFIG.catalogs.unidades.map(u => `<option value="${u}" ${item.unidade === u ? 'selected' : ''}>${u}</option>`).join('')}</select>
+                </td>
+                <td><input type="text" value="${item.fornecedor_sugerido || ''}" placeholder="Opcional"></td>
+                <td><input type="number" step="0.01" min="0" value="${item.preco_unitario_estimado || ''}" placeholder="0,00" style="width:120px"></td>
+                <td><input type="text" value="${item.observacao || ''}" placeholder="Observação"></td>
+                <td><button type="button" class="btn btn-outline" aria-label="Remover">🗑</button></td>
+            `;
+            row.querySelector('button').addEventListener('click', () => row.remove());
+            tbody.appendChild(row);
+        },
+        renderAnexos() {
+            const list = document.getElementById('fileList');
+            list.innerHTML = '';
+            AppState.anexos.forEach((file, idx) => {
+                const div = document.createElement('div');
+                div.className = 'file';
+                div.innerHTML = `<span>📎 ${file.nome} (${formatBytes(file.tamanho)})</span>`;
+                const btn = document.createElement('button');
+                btn.className = 'btn btn-outline';
+                btn.textContent = 'Remover';
+                btn.type = 'button';
+                btn.onclick = () => { AppState.anexos.splice(idx,1); UI.renderAnexos(); };
+                div.appendChild(btn);
+                list.appendChild(div);
+            });
+        },
+        clearForm() {
+            document.getElementById('pedidoForm').reset();
+            document.querySelector('#itensTable tbody').innerHTML = '';
+            AppState.anexos = [];
+            UI.renderAnexos();
+            UI.addItemRow();
+        }
+    };
+
+    function formatBytes(bytes) {
+        if (bytes === 0) return '0B';
+        const k = 1024; const sizes = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    }
+
+    async function processFiles(files) {
+        const maxFiles = 10; const maxSize = 5 * 1024 * 1024;
+        if (AppState.anexos.length + files.length > maxFiles) {
+            UI.alert('Limite de 10 arquivos', 'error');
+            return;
+        }
+        for (const file of files) {
+            if (file.size > maxSize) { UI.alert(`${file.name} excede 5MB`, 'error'); continue; }
+            const base64 = await toBase64(file);
+            AppState.anexos.push({ nome: file.name, tipo: file.type, tamanho: file.size, base64 });
+        }
+        UI.renderAnexos();
+    }
+
+    function toBase64(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result.split(',')[1]);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
+    }
+
+    function coletarItens() {
+        const rows = Array.from(document.querySelectorAll('#itensTable tbody tr'));
+        return rows.map((row) => {
+            const [material, quantidade, unidade, fornecedor, preco, observacao] = row.querySelectorAll('input, select');
+            return {
+                material: material.value.trim(),
+                quantidade: Number(quantidade.value) || 0,
+                unidade: unidade.value,
+                fornecedor_sugerido: fornecedor.value.trim(),
+                preco_unitario_estimado: Number(preco.value) || 0,
+                observacao: observacao.value.trim()
+            };
+        }).filter((i) => i.material && i.quantidade > 0);
+    }
+
+    async function enviarPedido(event) {
+        event.preventDefault();
+        const form = event.target;
+        if (!form.reportValidity()) return;
+
+        const itens = coletarItens();
+        if (itens.length === 0) {
+            UI.alert('Adicione ao menos um item', 'error');
+            return;
+        }
+
+        const formData = new FormData(form);
+        // E-mail é preenchido automaticamente para o backend; se não houver, gera um placeholder.
+        const emailSolicitante = formData.get('emailSolicitante') || `${(formData.get('nomeSolicitante') || 'sem-email').replace(/\\s+/g, '.').toLowerCase()}@sememail.local`;
+        const dataAgora = new Date().toISOString();
+        const pedido = {
+            id: `PED-${Date.now()}`,
+            status: 'PENDENTE_APROVACAO',
+            data_criacao: dataAgora,
+            criado_por: emailSolicitante,
+            solicitante: { nome: formData.get('nomeSolicitante'), email: emailSolicitante },
+            area_setor: formData.get('areaSetor'),
+            loja_unidade: formData.get('lojaUnidade'),
+            tipo_pedido: formData.get('tipoPedido'),
+            fornecedor_nome_digitado: formData.get('fornecedorNomeDigitado'),
+            fornecedor_cnpj: '',
+            descricao_detalhada: '',
+            justificativa: '',
+            observacoes: formData.get('ordensServico') || '',
+            anexos: AppState.anexos,
+            itens
+        };
+
+        const btn = document.getElementById('btnSubmit');
+        btn.disabled = true;
+        try {
+            await window.PedidoRepository.criar(pedido);
+            await window.NotificacaoService.enviarEvento('criado', pedido);
+            UI.alert('Pedido enviado e registrado como PENDENTE_APROVACAO.', 'success');
+            UI.clearForm();
+        } catch (error) {
+            console.error(error);
+            UI.alert('Erro ao enviar pedido. Verifique configurações.', 'error');
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        UI.renderSelect('areaSetorSelect', window.APP_CONFIG.catalogs.areas);
+        UI.renderSelect('lojaSelect', window.APP_CONFIG.catalogs.lojas);
+        UI.renderSelect('tipoPedidoSelect', ['REQUISICAO', 'FATURADO', 'COTACAO']);
+        UI.addItemRow();
+
+        document.getElementById('btnAddItem').addEventListener('click', () => UI.addItemRow());
+        document.getElementById('pedidoForm').addEventListener('submit', enviarPedido);
+        document.getElementById('btnReset').addEventListener('click', () => UI.clearForm());
+
+        const uploadArea = document.getElementById('uploadArea');
+        const input = document.getElementById('anexosInput');
+        uploadArea.addEventListener('click', () => input.click());
+        uploadArea.addEventListener('dragover', (e) => { e.preventDefault(); uploadArea.classList.add('dragover'); });
+        uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
+        uploadArea.addEventListener('drop', (e) => { e.preventDefault(); uploadArea.classList.remove('dragover'); if (e.dataTransfer.files.length) processFiles(e.dataTransfer.files); });
+        input.addEventListener('change', (e) => { if (e.target.files.length) processFiles(e.target.files); });
+    });
+</script>
+</body>
+</html>
