@@ -1,11 +1,18 @@
 import './globals.css';
 import { ReactNode } from 'react';
+import ToastProvider from '@/components/ToastProvider';
+
+export const metadata = {
+  title: 'Sistema de Pedidos',
+  description: 'Sistema de gestão de pedidos e aprovações'
+};
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="pt-BR">
       <body>
-        <main style={{ maxWidth: 1000, margin: '0 auto', padding: '24px' }}>
+        <ToastProvider />
+        <main className="container">
           {children}
         </main>
       </body>

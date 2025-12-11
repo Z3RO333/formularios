@@ -104,21 +104,67 @@ export async function replaceItens(supabase: SupabaseClient, pedidoId: string, i
 // Builds filters for painel listing respecting RLS (client token).
 export async function listarPedidos(
   supabase: SupabaseClient,
-  filtros: { status?: string; dataInicio?: string; dataFim?: string; loja?: string; area?: string; fornecedorId?: string }
+  filtros: {
+    status?: string;
+    dataInicio?: string;
+    dataFim?: string;
+    loja?: string;
+    area?: string;
+    fornecedorId?: string;
+    page?: number;
+    limit?: number;
+  }
 ) {
+  // Paginação (padrão: página 1, limite 20)
+  const page = filtros.page || 1;
+  const limit = filtros.limit || 20;
+  const from = (page - 1) * limit;
+  const to = from + limit - 1;
+
+  // Query otimizada com select específico (apenas campos necessários)
   let query = supabase
     .from('pedidos')
-    .select('*, fornecedores:fornecedor_id(nome_canonico), usuarios:solicitante_id(nome)')
-    .order('data_criacao', { ascending: false });
+    .select(
+      `
+      id,
+      area_setor,
+      loja_unidade,
+      tipo_pedido,
+      descricao_detalhada,
+      prioridade,
+      status,
+      data_criacao,
+      competencia_ano_mes,
+      fornecedores:fornecedor_id(id, nome_canonico),
+      usuarios:solicitante_id(id, nome)
+      `,
+      { count: 'exact' }
+    )
+    .order('data_criacao', { ascending: false })
+    .range(from, to);
+
+  // Aplicar filtros
   if (filtros.status) query = query.eq('status', filtros.status);
   if (filtros.loja) query = query.ilike('loja_unidade', `%${filtros.loja}%`);
   if (filtros.area) query = query.ilike('area_setor', `%${filtros.area}%`);
   if (filtros.fornecedorId) query = query.eq('fornecedor_id', filtros.fornecedorId);
   if (filtros.dataInicio) query = query.gte('data_criacao', filtros.dataInicio);
   if (filtros.dataFim) query = query.lte('data_criacao', filtros.dataFim);
-  const { data, error } = await query;
+
+  const { data, error, count } = await query;
   if (error) throw error;
-  return data;
+
+  // Retornar com metadados de paginação
+  return {
+    data: data || [],
+    pagination: {
+      page,
+      limit,
+      total: count || 0,
+      totalPages: Math.ceil((count || 0) / limit),
+      hasMore: to < (count || 0) - 1
+    }
+  };
 }
 
 export async function obterPedidoDetalhe(supabase: SupabaseClient, id: string) {
