@@ -33,6 +33,8 @@ export async function createPedido(supabase: SupabaseClient, profile: Profile, p
   const { error } = await supabase.from('pedidos').insert({
     id,
     solicitante_id: profile.id,
+    solicitante_nome: payload.colaborador_nome || profile.nome,
+    solicitante_email: profile.email,
     area_setor: payload.area_setor,
     loja_unidade: payload.loja_unidade,
     tipo_pedido: payload.tipo_pedido,
@@ -65,6 +67,8 @@ export async function updatePedido(supabase: SupabaseClient, profile: Profile, i
   const { error } = await supabase
     .from('pedidos')
     .update({
+      solicitante_nome: payload.colaborador_nome || profile.nome,
+      solicitante_email: profile.email,
       area_setor: payload.area_setor,
       loja_unidade: payload.loja_unidade,
       tipo_pedido: payload.tipo_pedido,
@@ -84,9 +88,42 @@ export async function updatePedido(supabase: SupabaseClient, profile: Profile, i
   return id;
 }
 
+/**
+ * ✅ REFATORADO: Agora usa UPSERT ao invés de DELETE+INSERT
+ * Isso previne perda de dados se o INSERT falhar
+ */
 export async function replaceItens(supabase: SupabaseClient, pedidoId: string, itens: PedidoItemInput[]) {
-  await supabase.from('itens_pedido').delete().eq('pedido_id', pedidoId);
-  if (!itens.length) return;
+  // Se não há itens, deletar todos existentes
+  if (!itens.length) {
+    const { error } = await supabase.from('itens_pedido').delete().eq('pedido_id', pedidoId);
+    if (error) throw error;
+    return;
+  }
+
+  // 1. Buscar itens existentes para identificar quais deletar
+  const { data: existentes, error: fetchError } = await supabase
+    .from('itens_pedido')
+    .select('id')
+    .eq('pedido_id', pedidoId);
+
+  if (fetchError) throw fetchError;
+
+  const existenteIds = new Set((existentes || []).map(e => e.id));
+  const novosItensIds = new Set(itens.filter(i => i.id).map(i => i.id!));
+
+  // 2. Deletar apenas itens que não estão mais na lista
+  const idsParaRemover = Array.from(existenteIds).filter(id => !novosItensIds.has(id));
+  if (idsParaRemover.length > 0) {
+    const { error: deleteError } = await supabase
+      .from('itens_pedido')
+      .delete()
+      .in('id', idsParaRemover);
+
+    if (deleteError) throw deleteError;
+  }
+
+  // 3. UPSERT (insert ou update) dos itens atuais
+  // Isso garante atomicidade: se um item já existe, é atualizado; senão, é inserido
   const rows = itens.map((i) => ({
     id: i.id || randomUUID(),
     pedido_id: pedidoId,
@@ -97,8 +134,12 @@ export async function replaceItens(supabase: SupabaseClient, pedidoId: string, i
     preco_unitario_estimado: i.preco_unitario_estimado ?? null,
     observacao: i.observacao || null
   }));
-  const { error } = await supabase.from('itens_pedido').insert(rows);
-  if (error) throw error;
+
+  const { error: upsertError } = await supabase
+    .from('itens_pedido')
+    .upsert(rows, { onConflict: 'id' });
+
+  if (upsertError) throw upsertError;
 }
 
 // Builds filters for painel listing respecting RLS (client token).
@@ -115,9 +156,9 @@ export async function listarPedidos(
     limit?: number;
   }
 ) {
-  // Paginação (padrão: página 1, limite 20)
+  // Paginação (padrão: página 1, limite 50 - aumentado de 20)
   const page = filtros.page || 1;
-  const limit = filtros.limit || 20;
+  const limit = Math.min(filtros.limit || 50, 100); // Máximo 100
   const from = (page - 1) * limit;
   const to = from + limit - 1;
 
@@ -209,25 +250,15 @@ export function mapPdfItemsToPedido(itens: ImportPdfResponse['itens']): PedidoIt
     itens?.map((i) => ({
       descricao_item: i.descricao,
       quantidade: Number(i.quantidade) || 0,
-      unidade: i.unidade || 'UN',
+      unidade: i.unidade || '',
       preco_unitario_estimado: i.preco_unitario ?? null,
       observacao: i.observacao || ''
     })) || []
   );
 }
 
-export function validatePedido(payload: PedidoInput) {
-  if (!payload.area_setor || !payload.loja_unidade || !payload.tipo_pedido || !payload.descricao_detalhada || !payload.justificativa || !payload.prioridade) {
-    throw new Error('Preencha todos os campos obrigatórios do pedido.');
-  }
-  payload.itens?.forEach((i, idx) => {
-    if (!i.descricao_item) throw new Error(`Item ${idx + 1}: descrição obrigatória`);
-    if (i.quantidade < 0) throw new Error(`Item ${idx + 1}: quantidade inválida`);
-    if (i.preco_unitario_estimado !== undefined && i.preco_unitario_estimado !== null && i.preco_unitario_estimado < 0) {
-      throw new Error(`Item ${idx + 1}: preço inválido`);
-    }
-  });
-}
+// ❌ REMOVIDO: validatePedido() - Agora usamos pedidoCreateSchema (Zod) em todas as rotas
+// para garantir validação consistente entre POST e PUT
 
 // Usa service role para atualizar status (aprovação/recusa) com histórico.
 export async function atualizarStatusComHistorico(

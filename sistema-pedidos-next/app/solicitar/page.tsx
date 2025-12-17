@@ -2,9 +2,10 @@
 
 import type { ChangeEvent, FormEvent } from 'react';
 import { useEffect, useRef, useState } from 'react';
+import toast from 'react-hot-toast';
 import { authFetch } from '@/lib/authFetch';
 import { importarItensDoPdf } from '@/lib/pdfImportService';
-import { emptyItem, mapPdfItensToPedido } from '@/lib/pedidoUtils';
+import { emptyItem, mergeItensPedido } from '@/lib/pedidoUtils';
 import type { PedidoItemInput, Prioridade } from '@/lib/types';
 
 type FormState = {
@@ -14,6 +15,7 @@ type FormState = {
   descricao_detalhada: string;
   justificativa: string;
   prioridade: Prioridade;
+  colaborador_nome: string;
   fornecedor_nome: string;
   fornecedor_cnpj: string;
   fornecedor_email: string;
@@ -27,18 +29,40 @@ export default function SolicitarPage() {
   const [profile, setProfile] = useState<any>(null);
   const [itens, setItens] = useState<PedidoItemInput[]>([emptyItem]);
   const [form, setForm] = useState<FormState>({
-    area_setor: '',
+    area_setor: 'GERAL',
     loja_unidade: '',
     tipo_pedido: '',
     descricao_detalhada: '',
     justificativa: '',
     prioridade: 'MEDIA',
+    colaborador_nome: '',
     fornecedor_nome: '',
     fornecedor_cnpj: '',
     fornecedor_email: ''
   });
 
   const fileInput = useRef<HTMLInputElement>(null);
+  const unidadesMedida = [
+    'UN',
+    'KG',
+    'G',
+    'MG',
+    'M',
+    'CM',
+    'MM',
+    'M2',
+    'M3',
+    'L',
+    'ML',
+    'CX',
+    'PC',
+    'PCT',
+    'PAR',
+    'ROLO',
+    'FD',
+    'SC',
+    'KIT'
+  ];
 
   useEffect(() => {
     // Recupera perfil do usuário autenticado para exibir info no cabeçalho.
@@ -88,9 +112,32 @@ export default function SolicitarPage() {
     }
   }
 
-  function buildPayload(includeItems: boolean) {
+  function buildPayload(includeItems: boolean, withFallbacks = false) {
+    const fallback = {
+      area_setor: 'GERAL',
+      loja_unidade: 'PENDENTE',
+      tipo_pedido: 'IMPORTACAO',
+      descricao_detalhada: 'Importacao via PDF',
+      justificativa: 'Importacao de itens via PDF',
+      colaborador_nome: 'Desconhecido'
+    };
+
+    const colaboradorNome = form.colaborador_nome.trim();
+    const fornecedorNome = form.fornecedor_nome.trim();
+    const fornecedorCnpj = form.fornecedor_cnpj.trim();
+    const fornecedorEmail = form.fornecedor_email.trim();
+
     const payload: any = {
       ...form,
+      area_setor: withFallbacks && !form.area_setor ? fallback.area_setor : form.area_setor,
+      loja_unidade: withFallbacks && !form.loja_unidade ? fallback.loja_unidade : form.loja_unidade,
+      tipo_pedido: withFallbacks && !form.tipo_pedido ? fallback.tipo_pedido : form.tipo_pedido,
+      descricao_detalhada: withFallbacks && !form.descricao_detalhada ? fallback.descricao_detalhada : form.descricao_detalhada,
+      justificativa: withFallbacks && !form.justificativa ? fallback.justificativa : form.justificativa,
+      colaborador_nome: colaboradorNome || (withFallbacks ? fallback.colaborador_nome : undefined),
+      fornecedor_nome: fornecedorNome || undefined,
+      fornecedor_cnpj: fornecedorCnpj || null,
+      fornecedor_email: fornecedorEmail || null,
       prioridade: form.prioridade,
       itens: includeItems
         ? itens
@@ -106,16 +153,40 @@ export default function SolicitarPage() {
   }
 
   async function ensurePedidoCriado() {
-    if (pedidoId) return pedidoId;
-    const res = await authFetch('/api/pedidos', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(buildPayload(false))
-    });
-    const json = await res.json();
-    if (!res.ok) throw new Error(json.error || 'Erro ao criar pedido');
-    setPedidoId(json.id);
-    return json.id as string;
+    // ✅ Se já tem ID real (não temporário), retornar
+    if (pedidoId && !pedidoId.startsWith('temp-')) {
+      return pedidoId;
+    }
+
+    try {
+      // Tentar criar pedido com dados mínimos obrigatórios
+      const payload = buildPayload(false, true); // com fallbacks
+
+      const res = await authFetch('/api/pedidos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      const json = await res.json();
+
+      if (!res.ok) {
+        // Mostrar erro específico ao usuário
+        const errorMsg = json.error || 'Erro ao criar pedido';
+        toast.error(`Preencha os campos obrigatórios: ${errorMsg}`);
+        throw new Error(errorMsg);
+      }
+
+      setPedidoId(json.id);
+      toast.success('Pedido criado com sucesso');
+      return json.id as string;
+
+    } catch (err: any) {
+      // ❌ REMOVIDO: não criar ID temporário
+      // ✅ NOVO: bloquear importação até preencher formulário
+      setStatus(`Erro: ${err.message}. Preencha os campos obrigatórios antes de importar PDF.`);
+      throw err; // Propagar erro para bloquear importação
+    }
   }
 
   async function onSelectPdf(e: ChangeEvent<HTMLInputElement>) {
@@ -126,20 +197,60 @@ export default function SolicitarPage() {
     try {
       const id = await ensurePedidoCriado();
       const result = await importarItensDoPdf(id, file);
-      if (result.itens?.length) {
-        setItens(mapPdfItensToPedido(result.itens));
+
+      const itensImportados: PedidoItemInput[] = result.itens || [];
+      const existeItens = itens.some((i) => i.descricao_item.trim());
+
+      if (!itensImportados.length) {
+        toast('Não encontrei itens no PDF');
+      } else if (existeItens) {
+        const substituir = window.confirm('Já existem itens no pedido.\nOK para substituir, Cancelar para mesclar.');
+        if (substituir) {
+          setItens(itensImportados);
+        } else {
+          setItens(mergeItensPedido(itens, itensImportados));
+        }
+      } else {
+        setItens(itensImportados);
       }
+
       if (result.fornecedor) {
         updateForm('fornecedor_nome', result.fornecedor.nome || form.fornecedor_nome);
         updateForm('fornecedor_cnpj', result.fornecedor.cnpj || form.fornecedor_cnpj);
         updateForm('fornecedor_email', result.fornecedor.email || form.fornecedor_email);
       }
-      setStatus('Itens importados do PDF.');
+
+      if (result.loja_unidade && !form.loja_unidade) {
+        updateForm('loja_unidade', result.loja_unidade);
+      }
+
+      setStatus(`Itens importados do PDF: ${itensImportados.length || 0} itens encontrados.`);
+      toast.success('PDF importado. Itens preenchidos.');
     } catch (error: any) {
+      console.error('❌ Erro ao importar PDF:', error);
       setStatus(error.message || 'Erro ao importar PDF');
+      toast.error(error.message || 'Erro ao importar PDF');
     } finally {
       setImporting(false);
       if (fileInput.current) fileInput.current.value = '';
+    }
+  }
+
+  async function salvarItensImportados() {
+    try {
+      const id = await ensurePedidoCriado();
+      const payload = buildPayload(true);
+      const res = await authFetch(`/api/pedidos/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Erro ao salvar itens');
+      toast.success('Itens importados salvos no pedido');
+      setPedidoId(id);
+    } catch (e: any) {
+      toast.error(e.message || 'Erro ao salvar itens');
     }
   }
 
@@ -150,10 +261,11 @@ export default function SolicitarPage() {
       <form onSubmit={handleSalvar}>
         <section>
           <h3>Dados do Pedido</h3>
-          <label>Área / Setor</label>
-          <input value={form.area_setor} onChange={(e) => updateForm('area_setor', e.target.value)} required />
+          {/* Área/Setor fixo; retirado do formulário visível */}
           <label>Loja / Unidade</label>
           <input value={form.loja_unidade} onChange={(e) => updateForm('loja_unidade', e.target.value)} required />
+          <label>Nome do colaborador</label>
+          <input value={form.colaborador_nome} onChange={(e) => updateForm('colaborador_nome', e.target.value)} placeholder="Digite o nome do colaborador" />
           <label>Tipo de pedido</label>
           <select value={form.tipo_pedido} onChange={(e) => updateForm('tipo_pedido', e.target.value)} required>
             <option value="">Selecione</option>
@@ -161,17 +273,10 @@ export default function SolicitarPage() {
             <option value="FATURADO">Faturado</option>
             <option value="COTACAO">Cotação</option>
           </select>
-          <label>Descrição detalhada</label>
-          <textarea value={form.descricao_detalhada} onChange={(e) => updateForm('descricao_detalhada', e.target.value)} required />
+          <label>Ordem de Serviço</label>
+          <textarea value={form.descricao_detalhada} onChange={(e) => updateForm('descricao_detalhada', e.target.value)} />
           <label>Justificativa</label>
           <textarea value={form.justificativa} onChange={(e) => updateForm('justificativa', e.target.value)} required />
-          <label>Prioridade</label>
-          <select value={form.prioridade} onChange={(e) => updateForm('prioridade', e.target.value as Prioridade)} required>
-            <option value="BAIXA">Baixa</option>
-            <option value="MEDIA">Média</option>
-            <option value="ALTA">Alta</option>
-            <option value="URGENTE">Urgente</option>
-          </select>
         </section>
 
         <section>
@@ -192,9 +297,17 @@ export default function SolicitarPage() {
                 {importing ? 'Importando...' : 'Importar itens do PDF'}
               </button>
               <button type="button" onClick={addItem} disabled={saving}>Adicionar item</button>
+              <button type="button" onClick={salvarItensImportados} disabled={saving || importing || !itens.length}>
+                Salvar itens importados
+              </button>
             </div>
           </div>
           <input ref={fileInput} type="file" accept="application/pdf" style={{ display: 'none' }} onChange={onSelectPdf} />
+          <datalist id="unidades-medida">
+            {unidadesMedida.map((u) => (
+              <option key={u} value={u} />
+            ))}
+          </datalist>
           {itens.map((item, idx) => (
             <div key={idx} style={{ border: '1px solid #1f2937', borderRadius: 8, padding: 12, marginBottom: 12 }}>
               <div style={{ display: 'flex', gap: 12 }}>
@@ -208,7 +321,12 @@ export default function SolicitarPage() {
                 </div>
                 <div style={{ flex: 1 }}>
                   <label>Unidade</label>
-                  <input value={item.unidade} onChange={(e) => updateItem(idx, 'unidade', e.target.value)} />
+                  <input
+                    list="unidades-medida"
+                    value={item.unidade}
+                    onChange={(e) => updateItem(idx, 'unidade', e.target.value)}
+                    placeholder="Selecione ou digite"
+                  />
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 12, marginTop: 8 }}>

@@ -37,3 +37,7 @@ coverage/
 Thumbs.db
 .idea/
 .vscode/
+sistema-pedidos-next/.env.example
+sistema-pedidos-next/supabase/schema.sql
+sistema-pedidos-next/supabase/schema.sql
+sistema-pedidos-next/.env.example

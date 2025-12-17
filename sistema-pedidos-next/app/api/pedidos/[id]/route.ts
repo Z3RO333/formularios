@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthContext } from '@/lib/supabaseServer';
-import { obterPedidoDetalhe, updatePedido, validatePedido } from '@/lib/pedidosService';
+import { obterPedidoDetalhe, updatePedido } from '@/lib/pedidosService';
+import { validateAndParse, pedidoCreateSchema } from '@/lib/validations';
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   const ctx = await getAuthContext(req);
@@ -16,12 +17,20 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
   const ctx = await getAuthContext(req);
   if (!ctx) return NextResponse.json({ error: 'Não autenticado' }, { status: 401 });
+
   try {
-    const body = (await req.json()) as any;
-    validatePedido(body);
-    await updatePedido(ctx.supabase, ctx.profile, params.id, body);
+    const body = await req.json();
+
+    // ✅ USAR MESMA VALIDAÇÃO DO POST (Zod)
+    // Consistência: mesmas regras de validação para criação e atualização
+    const validatedData = validateAndParse(pedidoCreateSchema, body);
+
+    await updatePedido(ctx.supabase, ctx.profile, params.id, validatedData);
     return NextResponse.json({ id: params.id });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Erro ao atualizar pedido' }, { status: 400 });
+    return NextResponse.json(
+      { error: error.message || 'Erro ao atualizar pedido' },
+      { status: 400 }
+    );
   }
 }

@@ -27,14 +27,26 @@ export function getServiceRoleClient() {
 // Fetches authenticated Supabase user + profile row from usuarios table.
 export async function getAuthContext(req: NextRequest) {
   const { supabase, token } = getRlsClient(req);
-  if (!token) return null;
+  if (!token) {
+    console.warn('[AUTH] Token ausente na requisição');
+    return null;
+  }
   const { data: auth, error: authError } = await supabase.auth.getUser(token);
-  if (authError || !auth?.user) return null;
+  if (authError || !auth?.user) {
+    console.warn('[AUTH] Erro ao validar token:', authError?.message);
+    return null;
+  }
+
   const { data: perfil, error: perfilError } = await supabase
     .from('usuarios')
     .select('*')
     .eq('auth_user_id', auth.user.id)
     .single();
-  if (perfilError || !perfil) return null;
+
+  if (perfilError || !perfil) {
+    console.warn('[AUTH] Perfil não encontrado para user:', auth.user.id);
+    return null;
+  }
+
   return { supabase, token, authUser: auth.user, profile: perfil };
 }

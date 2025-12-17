@@ -8,8 +8,8 @@ type Filtros = {
   dataInicio: string;
   dataFim: string;
   loja: string;
-  area: string;
   fornecedorId: string;
+  page?: number;
 };
 
 export default function PainelPage() {
@@ -18,7 +18,14 @@ export default function PainelPage() {
   const [loadingLista, setLoadingLista] = useState(false);
   const [loadingDetalhe, setLoadingDetalhe] = useState(false);
   const [mensagem, setMensagem] = useState<string | null>(null);
-  const [filtros, setFiltros] = useState<Filtros>({ status: '', dataInicio: '', dataFim: '', loja: '', area: '', fornecedorId: '' });
+  const [filtros, setFiltros] = useState<Filtros>({ status: '', dataInicio: '', dataFim: '', loja: '', fornecedorId: '' });
+  const [paginacao, setPaginacao] = useState<{
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+    hasMore: boolean;
+  } | null>(null);
 
   useEffect(() => {
     carregar();
@@ -32,10 +39,20 @@ export default function PainelPage() {
     Object.entries(filtros).forEach(([k, v]) => v && params.append(k, v));
     try {
       const res = await authFetch(`/api/pedidos?${params.toString()}`);
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Erro ao listar');
-      setPedidos(data);
-      if (selecionado && data.every((p: any) => p.id !== selecionado.id)) {
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Erro ao listar');
+
+      // ✅ CORRIGIDO: API retorna { data: [], pagination: {} }
+      // Aceitar ambos formatos para compatibilidade
+      const pedidosArray = Array.isArray(json) ? json : (json.data || []);
+      setPedidos(pedidosArray);
+
+      // ✅ Guardar metadados de paginação
+      if (json.pagination) {
+        setPaginacao(json.pagination);
+      }
+
+      if (selecionado && pedidosArray.every((p: any) => p.id !== selecionado.id)) {
         setSelecionado(null);
       }
     } catch (error: any) {
@@ -116,13 +133,45 @@ export default function PainelPage() {
           </div>
           {filtroInput('Data início', 'dataInicio', 'date')}
           {filtroInput('Data fim', 'dataFim', 'date')}
-          {filtroInput('Área/Setor', 'area')}
           {filtroInput('Loja', 'loja')}
           {filtroInput('Fornecedor ID', 'fornecedorId')}
           <button type="button" onClick={carregar} disabled={loadingLista}>
             {loadingLista ? 'Filtrando...' : 'Aplicar filtros'}
           </button>
         </div>
+
+        {/* ✅ UI de Paginação */}
+        {paginacao && (
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 12, padding: '8px 0', borderTop: '1px solid #ddd' }}>
+            <button
+              type="button"
+              onClick={() => {
+                const newPage = paginacao.page - 1;
+                setFiltros(prev => ({ ...prev, page: newPage } as any));
+                setTimeout(carregar, 100);
+              }}
+              disabled={paginacao.page <= 1 || loadingLista}
+              style={{ padding: '4px 12px' }}
+            >
+              ← Anterior
+            </button>
+            <span style={{ padding: '0 12px', fontSize: '14px' }}>
+              Página <strong>{paginacao.page}</strong> de <strong>{paginacao.totalPages}</strong> ({paginacao.total} pedidos)
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                const newPage = paginacao.page + 1;
+                setFiltros(prev => ({ ...prev, page: newPage } as any));
+                setTimeout(carregar, 100);
+              }}
+              disabled={!paginacao.hasMore || loadingLista}
+              style={{ padding: '4px 12px' }}
+            >
+              Próxima →
+            </button>
+          </div>
+        )}
       </section>
 
       {mensagem && <p style={{ marginTop: 8 }}>{mensagem}</p>}
@@ -132,10 +181,10 @@ export default function PainelPage() {
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr>
+              <th>Nome do colaborador</th>
               <th>ID</th>
               <th>Data</th>
               <th>Loja</th>
-              <th>Solicitante</th>
               <th>Tipo</th>
               <th>Fornecedor</th>
               <th>Status</th>
@@ -144,10 +193,10 @@ export default function PainelPage() {
           <tbody>
             {pedidos.map((p) => (
               <tr key={p.id} style={{ cursor: 'pointer' }} onClick={() => abrirPedido(p.id)}>
+                <td>{p.usuarios?.nome || p.solicitante_nome || '-'}</td>
                 <td>{p.id}</td>
                 <td>{p.data_criacao ? new Date(p.data_criacao).toLocaleDateString() : '-'}</td>
                 <td>{p.loja_unidade}</td>
-                <td>{p.usuarios?.nome || p.solicitante_nome || '-'}</td>
                 <td>{p.tipo_pedido}</td>
                 <td>{p.fornecedores?.nome_canonico || p.fornecedor_nome_digitado || '-'}</td>
                 <td>{p.status}</td>
@@ -174,11 +223,11 @@ export default function PainelPage() {
             <p>Carregando...</p>
           ) : (
             <>
-              <p><strong>Área / Setor:</strong> {selecionado.area_setor}</p>
+              <p><strong>Colaborador:</strong> {selecionado.usuarios?.nome || selecionado.solicitante_nome || '-'}</p>
+              <p><strong>ID do Pedido:</strong> {selecionado.id}</p>
               <p><strong>Loja / Unidade:</strong> {selecionado.loja_unidade}</p>
               <p><strong>Tipo:</strong> {selecionado.tipo_pedido}</p>
-              <p><strong>Prioridade:</strong> {selecionado.prioridade}</p>
-              <p><strong>Descrição:</strong> {selecionado.descricao_detalhada}</p>
+              <p><strong>Ordem de Serviço:</strong> {selecionado.descricao_detalhada}</p>
               <p><strong>Justificativa:</strong> {selecionado.justificativa}</p>
               <p><strong>Fornecedor:</strong> {selecionado.fornecedores?.nome_canonico || selecionado.fornecedor_nome_digitado || '-'}</p>
               <h4>Itens</h4>

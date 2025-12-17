@@ -65,13 +65,17 @@ export const pedidoCreateSchema = z.object({
     .max(50, 'Tipo de pedido deve ter no máximo 50 caracteres')
     .trim(),
   descricao_detalhada: z.string()
-    .min(10, 'Descrição detalhada deve ter no mínimo 10 caracteres')
-    .max(2000, 'Descrição detalhada deve ter no máximo 2000 caracteres')
+    .max(2000, 'Ordem de Serviço deve ter no máximo 2000 caracteres')
     .trim(),
   justificativa: z.string()
     .min(10, 'Justificativa deve ter no mínimo 10 caracteres')
     .max(2000, 'Justificativa deve ter no máximo 2000 caracteres')
     .trim(),
+  colaborador_nome: z.string()
+    .min(2, 'Nome do colaborador deve ter no mínimo 2 caracteres')
+    .max(150, 'Nome do colaborador deve ter no máximo 150 caracteres')
+    .trim()
+    .optional(),
   prioridade: prioridadeSchema,
   fornecedor_nome: z.string()
     .max(200, 'Nome do fornecedor deve ter no máximo 200 caracteres')

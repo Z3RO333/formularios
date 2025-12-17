@@ -1,6 +1,7 @@
 import './globals.css';
 import { ReactNode } from 'react';
 import ToastProvider from '@/components/ToastProvider';
+import TopNav from '@/components/TopNav';
 
 export const metadata = {
   title: 'Sistema de Pedidos',
@@ -12,6 +13,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="pt-BR">
       <body>
         <ToastProvider />
+        <TopNav />
         <main className="container">
           {children}
         </main>
